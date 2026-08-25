@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="国际象棋开局弱点分析：统计 Lichess / Chess.com 对局，找出薄弱开局，支持鳕鱼引擎与 AI 诊断。" />
+  <meta name="theme-color" content="#262421" />
+  <title>开局弱点分析 + 鳕鱼引擎 + AI</title>
+  <link rel="stylesheet" href="main.css" />
+</head>
+<body class="lichess">
+<div class="container">
+    <header>
+      <div class="header-title-row">
+        <h1>开局弱点分析 + 鳕鱼引擎 + AI</h1>
+        <div class="desktop-dl-wrap" id="desktopDlWrap">
+          <button type="button" class="desktop-dl-btn" id="btnGameBrowser" title="独立浏览/分析对局（类似 Chessis）">对局浏览器</button>
+          <button type="button" class="desktop-dl-btn" id="btnDesktopDl" aria-expanded="false">下载桌面版</button>
+          <div class="desktop-dl-panel" id="desktopDlPanel" role="menu">
+            <button type="button" class="dl-item" id="dlWinBtn">下载 Windows 桌面版</button>
+            <button type="button" class="dl-item" id="dlApkBtn">下载 Android APK</button>
+            <div class="dl-note">均从本页面内嵌数据生成。Windows：解压 ZIP 后双击 start.bat。Android：安装 APK（允许未知来源）。</div>
+          </div>
+          <button type="button" class="desktop-dl-btn" id="btnAboutAuthor" aria-expanded="false">关于作者</button>
+          <div class="desktop-dl-panel about-panel" id="aboutAuthorPanel" role="menu" style="display:none">
+            <div class="about-author-name">作者：114514chess</div>
+            <button type="button" class="dl-item" id="btnAboutBilibili">① B站账号</button>
+            <button type="button" class="dl-item" id="btnAboutDouyin">② 抖音号 projector</button>
+            <button type="button" class="dl-item" id="btnAboutEmail">③ 邮箱 dq114514_2024@qq.com</button>
+            <div class="dl-note">B站：打开主页 · 抖音/邮箱：点击复制</div>
+          </div>
+        </div>
+      </div>
+      <p>弱势开局 · 对局浏览器 · 复盘训练 · 学习计划 · 图表 · 导出 · v2026.08.23b</p>
+        <span class="online-badge" id="onlineBadge" title="近1分钟活跃会话约数 · 无需自建服务器">
+          <span class="online-dot" aria-hidden="true"></span>
+          当前在线 <span class="online-num" id="onlineCount">—</span>
+        </span>
+
+      <div class="theme-row" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button type="button" class="btn btn-sm btn-outline" id="btnInstallPwa" style="display:none">安装到桌面</button>
+      </div>
+    </header>
+
+    <div class="platform-switch">
+      <button type="button" class="platform-btn active" data-platform="lichess">Lichess</button>
+      <button type="button" class="platform-btn" data-platform="chesscom">Chess.com</button>
+    </div>
+
+
+    <div class="controls">
+      <div class="full controls-api-only">
+        <span class="field-label">用户名</span>
+        <input type="text" id="username" placeholder="例如：DrNykterstein 或 Hikaru" autocomplete="off" />
+      </div>
+      <div class="controls-api-only">
+        <span class="field-label">最近局数</span>
+        <input type="number" id="maxGames" min="1" max="300" step="1" value="50" placeholder="例如 50" />
+      </div>
+      <div>
+        <span class="field-label">颜色</span>
+        <select id="colorFilter">
+          <option value="all">全部</option>
+          <option value="white">仅白棋</option>
+          <option value="black">仅黑棋</option>
+        </select>
+      </div>
+      <div class="btn-analyze-wrap">
+        <span class="field-label">&nbsp;</span>
+        <button class="btn btn-analyze" id="analyzeBtn">开始分析</button>
+      </div>
+      <div class="time-filter-wrap full">
+        <span class="field-label">时制（可多选 · 取所选时制的最近局）</span>
+        <div class="time-filter-row" id="timeFilterRow">
+          <label class="time-chip time-chip-all is-on"><input type="checkbox" id="timeAll" value="all" checked />全部</label>
+          <label class="time-chip"><input type="checkbox" class="time-opt" value="bullet" />子弹棋</label>
+          <label class="time-chip"><input type="checkbox" class="time-opt" value="blitz" />闪电棋</label>
+          <label class="time-chip"><input type="checkbox" class="time-opt" value="rapid" />快棋</label>
+          <label class="time-chip"><input type="checkbox" class="time-opt" value="classical" />慢棋</label>
+          <label class="time-chip"><input type="checkbox" class="time-opt" value="correspondence" />通讯棋</label>
+        </div>
+      </div>
+      <div class="extra-filters full">
+        <div>
+          <span class="field-label">结果</span>
+          <select id="resultFilter">
+            <option value="all">全部结果</option>
+            <option value="loss">仅负局</option>
+            <option value="win">仅胜局</option>
+            <option value="draw">仅和棋</option>
+          </select>
+        </div>
+        <div>
+          <span class="field-label">步数（半步）</span>
+          <div class="op-input">
+            <select id="plyOp" title="比较方式">
+              <option value=">=" selected>≥</option>
+              <option value=">">&gt;</option>
+              <option value="<">&lt;</option>
+              <option value="<=">≤</option>
+              <option value="=">=</option>
+            </select>
+            <input type="number" id="plyValue" min="0" max="500" step="1" value="" placeholder="留空=不限" />
+          </div>
+        </div>
+        <div>
+          <span class="field-label">对手评分</span>
+          <div class="op-input">
+            <select id="ratingOp" title="比较方式">
+              <option value=">=" selected>≥</option>
+              <option value=">">&gt;</option>
+              <option value="<">&lt;</option>
+              <option value="<=">≤</option>
+              <option value="=">=</option>
+            </select>
+            <input type="number" id="ratingValue" min="0" max="3500" step="1" placeholder="留空=不限" />
+          </div>
+        </div>
+        <div>
+          <span class="field-label">起始日期</span>
+          <input type="date" id="dateFrom" />
+        </div>
+        <div>
+          <span class="field-label">结束日期</span>
+          <input type="date" id="dateTo" />
+        </div>
+      </div>
+    </div>
+
+    <div class="status" id="status"></div>
+    <div class="progress hidden" id="progressBar"><div id="progressFill"></div></div>
+
+    <div id="results" class="hidden">
+      <div class="results-shell">
+        <div class="tab-group-bar" id="tabGroupBar" style="display:none;gap:6px;margin:0 0 8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm tab-group-btn active" data-group="analyze">分析</button>
+          <button type="button" class="btn btn-sm btn-outline tab-group-btn" data-group="practice">练习</button>
+          <button type="button" class="btn btn-sm btn-outline tab-group-btn" data-group="tools">工具</button>
+        </div>
+        <nav class="results-nav" id="resultTabs" aria-label="结果导航">
+          <button type="button" class="tab-btn active" data-tab="tab-overview" data-group="analyze">总览</button>
+          <button type="button" class="tab-btn" data-tab="tab-color" data-group="analyze">白 / 黑</button>
+          <button type="button" class="tab-btn" data-tab="tab-trend" data-group="analyze">趋势</button>
+          <button type="button" class="tab-btn" data-tab="tab-branch" data-group="analyze">分支</button>
+          <button type="button" class="tab-btn" data-tab="tab-rating" data-group="analyze">对手分档</button>
+          <button type="button" class="tab-btn" data-tab="tab-ai" data-group="analyze">AI 分析</button>
+          <button type="button" class="tab-btn" data-tab="tab-charts" data-group="tools">图表</button>
+          <button type="button" class="tab-btn" data-tab="tab-accuracy" data-group="tools">准确率</button>
+          <button type="button" class="tab-btn" data-tab="tab-review" data-group="practice">复盘</button>
+          <button type="button" class="tab-btn" data-tab="tab-plan" data-group="practice">计划</button>
+          <button type="button" class="tab-btn" data-tab="tab-train" data-group="practice">训练</button>
+          <button type="button" class="tab-btn" data-tab="tab-games" data-group="tools">对局</button>
+        </nav>
+        <div class="results-main">
+          <div class="toolbar-actions">
+            <button type="button" class="btn btn-sm btn-outline" id="btnExportCsv">导出 CSV</button>
+            <button type="button" class="btn btn-sm btn-outline" id="btnExportMd">导出报告</button>
+            <button type="button" class="btn btn-sm btn-outline" id="btnShare">复制摘要</button>
+            <button type="button" class="btn btn-sm btn-outline" id="btnShareReport">分享报告页</button>
+            <button type="button" class="btn btn-sm btn-outline" id="btnBatchAccuracy">批量角标</button>
+          </div>
+          <div class="stats-grid" id="overview"></div>
+
+          <div class="tab-panel" id="tab-overview" aria-hidden="false">
+            <div class="split-2">
+              <div class="section">
+                <h2>弱势开局 <span class="badge weak">重点</span></h2>
+                <div class="table-wrap" id="weakOpenings"></div>
+              </div>
+              <div class="section">
+                <h2>建议</h2>
+                <ul class="tips" id="tips"></ul>
+              </div>
+            </div>
+            <div class="section">
+              <h2>全部开局</h2>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>开局</th><th>局数</th><th>胜</th><th>和</th><th>负</th><th>得分率</th><th>表现</th>
+                    </tr>
+                  </thead>
+                  <tbody id="allOpenings"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-color">
+            <div class="split-2">
+              <div class="section">
+                <h2>白棋开局</h2>
+                <div class="table-wrap"><table>
+                  <thead><tr><th>开局</th><th>局数</th><th>胜/和/负</th><th>得分率</th></tr></thead>
+                  <tbody id="whiteOpenings"></tbody>
+                </table></div>
+              </div>
+              <div class="section">
+                <h2>黑棋开局</h2>
+                <div class="table-wrap"><table>
+                  <thead><tr><th>开局</th><th>局数</th><th>胜/和/负</th><th>得分率</th></tr></thead>
+                  <tbody id="blackOpenings"></tbody>
+                </table></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-trend">
+            <div class="section">
+              <h2>趋势 · 新半段 vs 旧半段</h2>
+              <p class="hint-text">按时间对半切开，看同一开局是在变好还是变差。</p>
+              <div class="table-wrap"><table>
+                <thead><tr><th>开局</th><th>总局</th><th>新半段</th><th>旧半段</th><th>变化</th></tr></thead>
+                <tbody id="trendTable"></tbody>
+              </table></div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-branch">
+            <div class="section">
+              <h2>开局分支</h2>
+              <p class="hint-text">点「棋盘对照」在下方用真实棋盘查看续着箭头。</p>
+              <div class="table-wrap"><table>
+                <thead><tr><th>分支</th><th>局数</th><th>得分率</th><th>开局</th><th></th></tr></thead>
+                <tbody id="branchTable"></tbody>
+              </table></div>
+            </div>
+            <div id="theoryBox" class="theory-box hidden"></div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-rating">
+            <div class="split-2">
+              <div class="section">
+                <h2>对手评分分档</h2>
+                <div class="table-wrap"><table>
+                  <thead><tr><th>分档</th><th>局数</th><th>胜/和/负</th><th>得分率</th></tr></thead>
+                  <tbody id="ratingTable"></tbody>
+                </table></div>
+              </div>
+              <div class="section">
+                <h2>弱势 × 分档</h2>
+                <div class="table-wrap" id="weakByRating"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-review">
+            <div class="section">
+              <h2>复盘清单 <span class="badge warn">本地</span></h2>
+              <p class="hint-text">勾选表示已复盘，保存在本机浏览器。</p>
+              <div class="toolbar-actions" style="justify-content:flex-start;margin-bottom:10px">
+                <button type="button" class="btn btn-sm btn-outline" id="btnBuildReview">从结果生成</button>
+                <button type="button" class="btn btn-sm btn-outline" id="btnClearReview">清空</button>
+                <button type="button" class="btn btn-sm btn-outline" id="btnWeakToReview">弱势负局→复盘</button>
+                <button type="button" class="btn btn-sm btn-outline" id="btnWeakToBatch">弱势负局→批量角标</button>
+              </div>
+              <div id="reviewList"></div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-plan">
+            <div class="section">
+              <h2>本周学习计划 <span class="badge ok">本地</span></h2>
+              <p class="hint-text">根据弱势开局自动生成：复盘 5 局 + 训练 3 题。勾选即完成。</p>
+              <div class="toolbar-actions" style="justify-content:flex-start;margin-bottom:10px">
+                <button type="button" class="btn btn-sm" id="btnGenPlan">生成本周计划</button>
+                <button type="button" class="btn btn-sm btn-outline" id="btnClearPlan">清空计划</button>
+              </div>
+              <div id="planList"></div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-train">
+            <div class="section">
+              <h2>训练</h2>
+              <p class="hint-text">从弱势负局抽中局局面：点格子走子，对比原着与引擎最佳着。可限定开局。</p>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+                <label class="hint-text" style="margin:0">专项开局</label>
+                <select id="trainOpeningFilter" style="min-height:36px;padding:6px 10px;border-radius:8px;background:var(--input-bg);color:var(--text-bright);border:1px solid var(--border);max-width:220px">
+                  <option value="">全部弱势</option>
+                </select>
+                <button type="button" class="btn" id="btnStartTrain">抽一题</button>
+              </div>
+              <div id="trainBox" class="train-box hidden">
+                <div id="trainMeta" class="hint-text"></div>
+                <div class="train-board-wrap"><div class="board" id="trainBoard" style="width:min(320px,90vw);height:min(320px,90vw);margin:12px auto;cursor:pointer"></div></div>
+                <div class="toolbar-actions" style="justify-content:center;margin-top:10px">
+                  <button type="button" class="btn btn-sm" id="btnRevealTrain">揭晓原着</button>
+                  <button type="button" class="btn btn-sm btn-outline" id="btnTrainEngine">引擎最佳</button>
+                  <button type="button" class="btn btn-sm btn-outline" id="btnNextTrain">下一题</button>
+                  <button type="button" class="btn btn-sm btn-outline" id="btnTrainAnalyze">完整分析</button>
+                </div>
+                <div id="trainAnswer" class="hint-text" style="text-align:center;margin-top:8px"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-charts">
+            <div class="toolbar-actions" style="justify-content:flex-start;margin-bottom:10px">
+              <button type="button" class="btn btn-sm btn-outline" id="btnExportChartsPng">导出图表 PNG</button>
+            </div>
+            <div class="section">
+              <h2>得分率趋势</h2>
+              <p class="hint-text">按对局时间顺序的滚动得分率。</p>
+              <div id="chartScoreTrend" class="chart-exportable" style="min-height:180px"></div>
+            </div>
+            <div class="section">
+              <h2>开局分布（局数 Top 8）</h2>
+              <div id="chartOpeningDist" class="chart-exportable" style="min-height:180px"></div>
+            </div>
+            <div class="section">
+              <h2>白 / 黑 得分对比</h2>
+              <div id="chartColorCompare" class="chart-exportable" style="min-height:120px"></div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-accuracy">
+            <div class="section">
+              <h2>批量准确率 <span class="badge warn">引擎</span></h2>
+              <p class="hint-text">对负局 / 弱势开局抽样跑引擎角标，统计失误集中区间（较耗时，建议 Wi‑Fi）。</p>
+              <div class="toolbar-actions" style="justify-content:flex-start;margin-bottom:10px">
+                <button type="button" class="btn btn-sm" id="btnRunBatchAccuracy">开始抽样分析</button>
+                <span id="batchAccStatus" class="hint-text" style="margin:0"></span>
+              </div>
+              <div id="batchAccSummary"></div>
+              <div class="table-wrap" style="margin-top:10px">
+                <table>
+                  <thead><tr><th>区间</th><th>步数样本</th><th>失误+</th><th>败着</th><th>平均分差</th></tr></thead>
+                  <tbody id="batchAccTable"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-games">
+            <div class="section">
+              <h2>对局列表</h2>
+              <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center">
+                <input type="text" id="gamesSearch" placeholder="搜索对手/开局…" style="flex:1;min-width:140px;padding:8px 10px;border-radius:8px;background:var(--input-bg);border:1px solid var(--border);color:var(--text-bright)" />
+                <select id="gamesSort" style="min-height:36px;padding:6px 10px;border-radius:8px;background:var(--input-bg);color:var(--text-bright);border:1px solid var(--border)">
+                  <option value="time_desc">时间新→旧</option>
+                  <option value="time_asc">时间旧→新</option>
+                  <option value="result">按结果</option>
+                  <option value="opening">按开局</option>
+                  <option value="rating_desc">对手分高→低</option>
+                </select>
+                <select id="gamesResultFilter" style="min-height:36px;padding:6px 10px;border-radius:8px;background:var(--input-bg);color:var(--text-bright);border:1px solid var(--border)">
+                  <option value="all">全部结果</option>
+                  <option value="loss">仅负</option>
+                  <option value="win">仅胜</option>
+                  <option value="draw">仅和</option>
+                </select>
+              </div>
+              <div class="table-wrap" style="max-height:min(60vh,560px)">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>颜色</th><th>对手</th><th>评分</th><th>结果</th><th>开局</th><th>时制</th><th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="recentGames"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="tab-panel hidden" id="tab-ai">
+            <div class="section">
+              <h2>AI 教练分析 <span class="badge ok">智谱清言 · 免费</span></h2>
+              <p class="hint-text">基于当前分析结果，由智谱清言（免费模型）生成个性化开局弱点解读与训练建议；不可用时自动切换原 AI。每人每天限 5 次。需先完成「开始分析」。</p>
+              <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;align-items:flex-end">
+                <div style="flex:1;min-width:200px">
+                  <label class="field-label">补充问题（可选）</label>
+                  <input type="text" id="aiCustomQ" placeholder="例如：黑方西西里我该怎么练？" style="width:100%" />
+                </div>
+                <button type="button" class="btn" id="btnAiAnalyze">生成 AI 报告</button>
+                <button type="button" class="btn btn-sm btn-outline" id="btnAiCopy">复制报告</button>
+              </div>
+              <div id="aiStatus" class="status" style="text-align:left;min-height:0;padding:6px 0"></div>
+              <div id="aiReport" class="theory-box" style="min-height:120px;white-space:pre-wrap;line-height:1.75;font-size:0.92rem">
+                点击「生成 AI 报告」后，这里会显示教练级解读……
+              </div>
+              <p class="hint-text" style="margin-top:10px;opacity:.55">优先智谱清言免费模型；失败时自动回退原 AI。每日 5 次（按本机日期计）。</p>
+            </div>
+          </div>
+        </div><!-- /.results-main -->
+      </div><!-- /.results-shell -->
+    </div>
+
+    <footer>
+      数据来自 Lichess / Chess.com 公开 API · 引擎为浏览器内 Stockfish · 仅显示中文开局名 · 可安装为离线应用
+    </footer>
+  </div>
+
+  <div class="modal-overlay hidden" id="modal">
+    <div class="modal">
+      <button class="modal-close" id="modalClose">&times;</button>
+      <h3 id="modalTitle">对局分析</h3>
+      <div class="analyze-layout">
+        <div class="board-wrap">
+          <div class="board-frame" style="position:relative">
+            <div class="board-ranks" id="boardRanks"></div>
+            <div class="board" id="board"></div>
+            <svg class="board-arrow-layer" id="arrowLayer" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+            <div class="board-files" id="boardFiles"></div>
+          </div>
+          <div class="arrow-hint" id="arrowHint"></div>
+          <div class="explore-banner" id="exploreBanner">对局浏览器：你已离开主线。绿箭=最佳着。点「返回主线」或「上一步」可回原谱。</div>
+          <div class="board-controls">
+            <button class="btn btn-sm btn-outline" id="btnStart">开局</button>
+            <button class="btn btn-sm btn-outline" id="btnPrev">上一步</button>
+            <button class="btn btn-sm btn-outline" id="btnNext">下一步</button>
+            <button class="btn btn-sm btn-outline" id="btnEnd">终局</button>
+            <button class="btn btn-sm btn-outline" id="btnExitExplore" style="display:none">返回主线</button>
+            <button class="btn btn-sm" id="btnEngine">重新评估</button>
+            <button class="btn btn-sm" id="btnAnnotate">生成角标</button>
+            <button class="btn btn-sm" id="btnWhyGlyph" style="display:none;background:#c33;box-shadow:none">为什么是双问号？</button>
+          </div>
+          <div class="move-list" id="moveList"></div>
+          <div class="legend-glyphs" id="glyphLegend" title="接近 Chess.com：按期望分损失 EPL 分级">
+            <span><i class="glyph glyph-best">★</i> 最佳</span>
+            <span><i class="glyph glyph-excellent">✓</i> 优秀</span>
+            <span><i class="glyph glyph-good">·</i> 不错</span>
+            <span><i class="glyph glyph-book">A</i> 理论</span>
+            <span><i class="glyph glyph-inaccuracy">?!</i> 不准</span>
+            <span><i class="glyph glyph-mistake">?</i> 错误</span>
+            <span><i class="glyph glyph-blunder">??</i> 漏着</span>
+          </div>
+        </div>
+        <div class="eval-panel">
+          <div style="font-weight:600;color:var(--text-bright);margin-bottom:8px">引擎评估</div>
+          <div class="engine-opts" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">
+            <label style="font-size:0.72rem;opacity:.85;display:flex;align-items:center;gap:4px">引擎
+              <select id="engineChoice" style="min-width:150px;padding:5px 8px;font-size:0.78rem;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text-bright)">
+                <option value="auto">自动</option>
+                <option value="stockfish">① Stockfish 18</option>
+                <option value="reckless">② Reckless</option>
+                <option value="plenty">③ PlentyChess</option>
+                <option value="lozza">Lozza（轻量备用）</option>
+              </select>
+            </label>
+            <label style="font-size:0.72rem;opacity:.85;display:flex;align-items:center;gap:4px">深度
+              <select id="engineDepth" style="min-width:64px;padding:5px 8px;font-size:0.78rem;background:var(--input-bg);border:1px solid var(--border);border-radius:8px;color:var(--text-bright)">
+                <option value="10">10</option>
+                <option value="12">12</option>
+                <option value="14" selected>14</option>
+                <option value="16">16</option>
+                <option value="18">18</option>
+                <option value="20">20</option>
+              </select>
+            </label>
+          </div>
+          <div class="eval-bar-wrap">
+            <div class="eval-bar-white" id="evalBar" style="width:50%"></div>
+            <div class="eval-score" id="evalScore">0.0</div>
+          </div>
+          <div id="engineLines"></div>
+          <div class="engine-status" id="engineStatus">选择引擎与深度后，点「重新评估」</div>
+          <div class="review-summary hidden" id="reviewSummary">
+            <div class="review-summary-title">对局复盘 · Chess.com 风格</div>
+            <div class="review-players" id="reviewPlayers"></div>
+            <div class="review-phase" id="reviewPhase"></div>
+            <div class="review-note">精度为本地鳕鱼/Stockfish 角标的估算值，不等同于 Chess.com 官方 Accuracy；等级分直接取本局记录中的双方 rating。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 对局浏览器（Chessis 风格：拉对局 / 贴 PGN / 空盘分析） -->
+  <div class="modal-overlay hidden" id="gameBrowserModal">
+    <div class="modal" style="max-width:980px">
+      <button class="modal-close" id="gameBrowserClose">&times;</button>
+      <h3>对局浏览器 <span class="badge ok" style="font-weight:650">Chessis 风格</span></h3>
+      <div style="padding:4px 4px 16px">
+        <p class="hint-text" style="margin-bottom:12px">无需先做开局弱点统计。可拉取 Lichess / Chess.com 对局、粘贴 PGN，或打开空盘自由分析（引擎·角标·探索变例与主分析器相同）。</p>
+
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;align-items:center">
+          <div class="platform-switch" style="margin:0;position:static;left:auto;transform:none;padding:3px">
+            <button type="button" class="platform-btn active" data-gb-platform="lichess" id="gbPlatLichess">Lichess</button>
+            <button type="button" class="platform-btn" data-gb-platform="chesscom" id="gbPlatChesscom">Chess.com</button>
+          </div>
+          <input type="text" id="gbUsername" placeholder="用户名" style="flex:1;min-width:120px;max-width:220px;padding:9px 12px;border-radius:10px;background:var(--input-bg);border:1px solid var(--border);color:var(--text-bright)" autocomplete="off" />
+          <input type="number" id="gbMaxGames" min="1" max="100" value="30" title="局数" style="width:72px;padding:9px 10px;border-radius:10px;background:var(--input-bg);border:1px solid var(--border);color:var(--text-bright)" />
+          <select id="gbColor" style="min-width:88px;padding:9px 10px;border-radius:10px;background:var(--input-bg);border:1px solid var(--border);color:var(--text-bright)">
+            <option value="all">全部颜色</option>
+            <option value="white">仅白棋</option>
+            <option value="black">仅黑棋</option>
+          </select>
+          <button type="button" class="btn btn-sm" id="gbFetchBtn">拉取对局</button>
+          <button type="button" class="btn btn-sm btn-outline" id="gbEmptyBoardBtn">空盘分析</button>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <label class="field-label" style="margin-bottom:6px">粘贴 PGN（可多局，以空行分隔）</label>
+          <textarea id="gbPgnInput" rows="4" placeholder="[Event &quot;…&quot;]&#10;1. e4 e5 …" style="width:100%;padding:10px 12px;border-radius:10px;background:var(--input-bg);border:1px solid var(--border);color:var(--text-bright);font-family:ui-monospace,monospace;font-size:0.82rem;resize:vertical;min-height:88px"></textarea>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center">
+            <button type="button" class="btn btn-sm" id="gbLoadPgnBtn">加载 PGN</button>
+            <button type="button" class="btn btn-sm btn-outline" id="gbClearListBtn">清空列表</button>
+            <span id="gbStatus" class="hint-text" style="margin:0;flex:1"></span>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center">
+          <input type="text" id="gbSearch" placeholder="搜索对手 / 开局…" style="flex:1;min-width:140px;padding:8px 10px;border-radius:8px;background:var(--input-bg);border:1px solid var(--border);color:var(--text-bright)" />
+          <select id="gbResultFilter" style="min-height:36px;padding:6px 10px;border-radius:8px;background:var(--input-bg);color:var(--text-bright);border:1px solid var(--border)">
+            <option value="all">全部结果</option>
+            <option value="loss">仅负</option>
+            <option value="win">仅胜</option>
+            <option value="draw">仅和</option>
+          </select>
+        </div>
+
+        <div class="table-wrap" style="max-height:min(48vh,420px);border:1px solid var(--border);border-radius:12px;background:var(--input-bg)">
+          <table>
+            <thead>
+              <tr>
+                <th>颜色</th><th>对手</th><th>评分</th><th>结果</th><th>开局</th><th>时制/日期</th><th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="gbGamesBody">
+              <tr><td colspan="7" style="opacity:.55;text-align:center;padding:20px">拉取对局或粘贴 PGN 后显示列表</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 开局详情 -->
+  <div class="modal-overlay hidden" id="openingModal">
+    <div class="modal" style="max-width:920px">
+      <button class="modal-close" id="openingModalClose">&times;</button>
+      <h3 id="openingModalTitle">开局详情</h3>
+      <div id="openingModalBody" style="padding:12px 16px 20px"></div>
+    </div>
+  </div>
+
+  <!-- 分享报告预览 -->
+  <div class="modal-overlay hidden" id="reportModal">
+    <div class="modal" style="max-width:720px">
+      <button class="modal-close" id="reportModalClose">&times;</button>
+      <h3>分享报告</h3>
+      <div style="padding:12px 16px 20px">
+        <div id="reportPreview" class="theory-box" style="max-height:50vh;overflow:auto"></div>
+        <div class="toolbar-actions" style="justify-content:flex-start;margin-top:12px">
+          <button type="button" class="btn btn-sm" id="btnCopyReportHtml">复制报告 HTML</button>
+          <button type="button" class="btn btn-sm btn-outline" id="btnOpenReportTab">新标签打开</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="chess.js"></script>
+  <script src="apk-data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
